@@ -22,11 +22,11 @@ When walking through the codebase, these deliberate engineering choices highligh
 
 ### 1. Direct Structured JSON Generation
 * **Implementation:** `src/utils/gemini.ts`
-* **Details:** We configure the Gemini call with `responseMimeType: 'application/json'` in the generation config. This forces the model to return structured, parseable JSON directly. 
+* **Details:** I configure the Gemini call with `responseMimeType: 'application/json'` in the generation config. This forces the model to return structured, parseable JSON directly. 
 * **Benefit:** It eliminates brittle, regex-based markdown wrapper stripping (handling missing triple backticks) and completely prevents JSON syntax parsing failures.
 
 ### 2. Dual-Layer Input Validation (Guardrails)
-To save API costs, prevent LLM hallucinations, and ensure high-signal inputs, we built a layered validation strategy:
+To save API costs, prevent LLM hallucinations, and ensure high-signal inputs, I built a layered validation strategy:
 * **Client-Side Regex Guard:** Matches incoming inputs against `/^[a-zA-Z][a-zA-Z\s\-\/&.]{1,}$/` inside `App.tsx` first. Obvious garbage, emojis, numbers, or single letters are intercepted immediately on the device without wasting API query limits.
 * **Prompt-Level LLM Guardrail:** If an input slips through the regex but is still gibberish or a non-professional role (e.g. a color, country, or random word), the Gemini model's system prompt instructs it to return a typed error payload:
   `{ "error": "That doesn't look like a job title..." }`
