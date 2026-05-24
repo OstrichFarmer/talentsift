@@ -16,7 +16,7 @@ TalentSift is a highly responsive, professional web application designed to gene
 
 ---
 
-## 🛠️ Deep-Dive Technical Highlights (For Loom Walkthrough)
+## 🛠️ Deep-Dive Technical Highlights
 
 When walking through the codebase, these deliberate engineering choices highlight production-grade architecture:
 
