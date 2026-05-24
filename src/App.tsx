@@ -25,6 +25,17 @@ export default function App() {
       return;
     }
 
+    // Heuristic guard: a plausible job title has at least 2 characters per word
+    // and contains only letters, spaces, hyphens, slashes, and ampersands.
+    // This stops clear non-titles (single letters, numbers, emoji strings) before
+    // we spend an API call on them. The prompt-level guardrail in gemini.ts handles
+    // anything more nuanced that slips through here.
+    const looksLikeJobTitle = /^[a-zA-Z][a-zA-Z\s\-\/&.]{1,}$/.test(title);
+    if (!looksLikeJobTitle) {
+      setValidationError('Please enter a valid job title (letters only, e.g. "Product Manager").');
+      return;
+    }
+
     setValidationError('');
     lastJobTitle.current = title;
     setAppState('loading');
@@ -41,8 +52,21 @@ export default function App() {
         err instanceof Error
           ? err.message
           : 'An unexpected error occurred. Please try again.';
-      setErrorMessage(msg);
-      setAppState('error');
+
+      // If Gemini's prompt-level guardrail fired, the error is about the input
+      // itself — show it inline under the field, not in the red error card.
+      const isInputError =
+        msg.toLowerCase().includes("doesn't look like a job title") ||
+        msg.toLowerCase().includes('not a job title') ||
+        msg.toLowerCase().includes('not a real job title');
+
+      if (isInputError) {
+        setAppState('idle');
+        setValidationError(msg);
+      } else {
+        setErrorMessage(msg);
+        setAppState('error');
+      }
     }
   };
 

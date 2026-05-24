@@ -4,6 +4,11 @@ export interface InterviewQuestion {
   intent: string;
 }
 
+// Returned by Gemini when the input isn't a recognisable job title
+interface GeminiErrorPayload {
+  error: string;
+}
+
 interface GeminiCandidate {
   content: {
     parts: Array<{ text: string }>;
@@ -47,13 +52,20 @@ export async function fetchInterviewQuestions(
   const systemInstruction = {
     parts: [
       {
-        text: 'You are a senior recruiter at an HRTech company. You design role-specific, competency-based interview questions that probe core skills and real-world scenarios, avoiding generic behavioral questions.',
+        text: 'You are a senior recruiter at an HRTech company. You design role-specific, competency-based interview questions that probe core skills and real-world scenarios, avoiding generic behavioral questions. If the input you receive is not a recognisable job title or professional role, you must return a JSON error object instead of questions.',
       },
     ],
   };
 
-  // Detailed prompt instructing the model to output a specific JSON structure
-  const userPrompt = `Generate exactly 3 interview questions for a "${jobTitle}" role.
+  // Detailed prompt instructing the model to output a specific JSON structure.
+  // The guard clause at the top is the prompt-level guardrail: it tells Gemini
+  // to return a typed error rather than hallucinating questions for nonsense input.
+  const userPrompt = `First, decide whether "${jobTitle}" is a recognisable job title or professional role.
+
+If it is NOT a real job title (e.g. it is a random word, a colour, a place name, or gibberish), return ONLY this JSON object and nothing else:
+{ "error": "That doesn't look like a job title. Try something like 'Product Manager' or 'Data Analyst'." }
+
+If it IS a valid job title, generate exactly 3 interview questions for a "${jobTitle}" role.
 
 Each question must:
 1. Target a specific competency or skill critical for a "${jobTitle}"
@@ -97,12 +109,19 @@ Example JSON:
   const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
   const cleanedJson = extractJson(rawText);
 
-  let questions: InterviewQuestion[];
+  let parsed: InterviewQuestion[] | GeminiErrorPayload;
   try {
-    questions = JSON.parse(cleanedJson);
+    parsed = JSON.parse(cleanedJson);
   } catch {
     throw new Error('Failed to parse the API response as valid JSON.');
   }
+
+  // Prompt-level guardrail: Gemini signals that the input isn't a real job title
+  if (!Array.isArray(parsed) && typeof parsed === 'object' && 'error' in parsed) {
+    throw new Error((parsed as GeminiErrorPayload).error);
+  }
+
+  const questions = parsed as InterviewQuestion[];
 
   if (!Array.isArray(questions) || questions.length === 0) {
     throw new Error('Unexpected response format from the AI model.');
